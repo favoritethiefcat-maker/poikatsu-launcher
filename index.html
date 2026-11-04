@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ポイ活URLランチャー</title>
+<base target="_blank">
+<script>window.API_URL="https://script.google.com/macros/s/AKfycbwflHcKZaTssAD49wlKo6Gxm2xn1IlUaHKy3smogv-GvhQrLAeoBqQoi3tBirq406p4/exec";</script>
+<style>
+/* Layout: カテゴリ（お酒・その他・X）ごとのカード。各行は 鍵｜名前（タップで開く）｜コピー系ボタン */
+:root{
+  --bg:#eef3f1; --surface:#ffffff; --ink:#173a35; --muted:#5d7570; --line:#d3dfdb;
+  --accent:#0f6b5c; --accent-ink:#ffffff; --gold:#c98a12; --gold-soft:#fbefd6; --done:#93a6a1; --danger:#b3412f;
+  --bar-bg:#ffffff; --bar-ink:#000000;
+  --display:"Hiragino Maru Gothic ProN","Hiragino Sans","Noto Sans JP","Meiryo",sans-serif;
+  --body:"Hiragino Sans","Noto Sans JP","Yu Gothic","Meiryo",sans-serif;
+  --mono:ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0f1a18; --surface:#162523; --ink:#e3eeeb; --muted:#97aba6; --line:#2a3d3a;
+  --accent:#3fb39c; --accent-ink:#06201b; --gold:#e8b04a; --gold-soft:#3a2f17; --done:#5f736e; --danger:#e07a68; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0f1a18; --surface:#162523; --ink:#e3eeeb; --muted:#97aba6; --line:#2a3d3a;
+  --accent:#3fb39c; --accent-ink:#06201b; --gold:#e8b04a; --gold-soft:#3a2f17; --done:#5f736e; --danger:#e07a68; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.6}
+.wrap{max-width:760px;margin:0 auto;padding-block:20px 48px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:18px}
+h1,h2{font-family:var(--display);margin:0;text-wrap:balance;line-height:1.3}
+h1{font-size:1.5rem}
+h2{font-size:1.1rem}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
+.btn{display:inline-flex;align-items:center;gap:4px;border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:4px 12px;cursor:pointer;text-decoration:none;color:var(--ink);font-size:.85rem;font-weight:500;white-space:nowrap}
+.btn:hover{border-color:var(--accent)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:700;font-size:.95rem;padding:6px 16px}
+.btn.copied{background:var(--gold-soft);border-color:var(--gold)}
+.btn[disabled]{opacity:.5;cursor:default}
+.top p{margin:4px 0 0;color:var(--muted);font-size:.88rem}
+.notice{padding:10px 14px;border-radius:10px;background:var(--gold-soft);font-size:.9rem}
+.tabs{display:flex;gap:8px;overflow-x:auto;padding-bottom:2px}
+.tab{border:1px solid var(--line);background:transparent;border-radius:999px;padding:4px 14px;cursor:pointer;white-space:nowrap;font-size:.9rem}
+.tab[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px}
+#sections{display:flex;flex-direction:column;gap:14px}
+.cat{padding:14px 16px;display:flex;flex-direction:column;gap:6px}
+.cat-head{display:flex;gap:10px;align-items:baseline}
+.cat-head h2{flex:1;min-width:0}
+.catmove{display:flex;gap:2px}
+.catmove .icon{font-size:1rem;border:1px solid var(--line);border-radius:8px;padding:0 8px}
+.count{color:var(--muted);font-size:.85rem;font-variant-numeric:tabular-nums}
+.rows{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.row{display:flex;flex-wrap:wrap;gap:8px 10px;align-items:center;padding:10px 0;border-top:1px dashed var(--line)}
+.row:first-child{border-top:0}
+.lock{width:34px;height:34px;flex:none;border-radius:50%;border:2px solid var(--line);background:transparent;cursor:pointer;display:grid;place-items:center;font-size:1rem;line-height:1;filter:grayscale(1);opacity:.45}
+.row.locked .lock{background:var(--gold-soft);border-color:var(--gold);filter:none;opacity:1}
+.name{flex:1 1 9em;min-width:0;display:flex;flex-direction:column;text-decoration:none;color:var(--ink)}
+.name b{font-weight:700;overflow-wrap:anywhere}
+a.name b{color:var(--accent);text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:3px}
+.name small{font-family:var(--mono);font-size:.72rem;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.name .note{font-size:.78rem;color:var(--muted)}
+.quote{flex-basis:100%;font-size:.85rem;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:6px 10px;margin-top:4px;white-space:pre-wrap;overflow-wrap:anywhere}
+.quote em{display:block;font-style:normal;font-size:.72rem;color:var(--muted)}
+.quote.none{color:var(--muted)}
+.row.locked .name b{color:var(--done);text-decoration:line-through}
+.row.locked .name{cursor:not-allowed}
+.acts{margin-left:auto;display:flex;flex-wrap:wrap;gap:6px;align-items:center;flex:none}
+.tgt{border:0;background:transparent;cursor:pointer;font-size:1.1rem;line-height:1;padding:4px;filter:grayscale(1);opacity:.35}
+.row.locked .tgt{filter:none;opacity:1}
+.edit{display:flex;gap:2px;flex-basis:100%;justify-content:flex-end}
+.icon{border:0;background:transparent;cursor:pointer;color:var(--muted);padding:2px 6px;border-radius:6px;font-size:.8rem}
+.icon:hover{background:var(--bg);color:var(--ink)}
+.icon.danger{color:var(--danger)}
+.badge{display:inline-block;font-size:.72rem;padding:0 8px;border-radius:999px;border:1px solid var(--line);color:var(--muted);margin-top:2px;width:max-content}
+.badge.warn{background:var(--gold-soft);color:var(--ink);border-color:var(--gold)}
+.badge.urgent{color:var(--danger);border-color:var(--danger);font-weight:700}
+.row.over{opacity:.55}
+.empty{padding:12px 0 4px;color:var(--muted);font-size:.88rem}
+/* JAN */
+.jan-panel{flex-basis:100%;display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;padding:4px 0}
+.jan{border:1px solid var(--line);border-radius:12px;padding:10px;display:flex;flex-direction:column;gap:6px;min-width:0}
+.jan .code{font-family:var(--mono);font-size:1rem;letter-spacing:.04em}
+.jan .bc{background:var(--bar-bg);border-radius:6px;padding:6px;line-height:0}
+.jan .bc svg{width:100%;height:auto;display:block}
+/* form */
+details.card>summary{cursor:pointer;padding:14px 16px;font-family:var(--display);font-weight:700;font-size:1.05rem;list-style:none;display:flex;justify-content:space-between;gap:10px}
+details.card>summary::after{content:"＋";color:var(--muted)}
+details[open].card>summary::after{content:"－"}
+.panel-body{padding:0 16px 16px;display:flex;flex-direction:column;gap:12px}
+.panel-body p{margin:0;color:var(--muted);font-size:.88rem}
+.field{display:flex;flex-direction:column;gap:4px;min-width:0}
+.field label,.flabel{font-size:.78rem;color:var(--muted);letter-spacing:.04em}
+.field input,.field textarea{border:1px solid var(--line);background:var(--bg);border-radius:10px;padding:8px 10px;width:100%;min-width:0}
+textarea{resize:vertical;min-height:90px}
+.mono{font-family:var(--mono);font-size:.82rem}
+.seg{display:flex;gap:6px;flex-wrap:wrap}
+.seg label{display:inline-flex;align-items:center;gap:4px;border:1px solid var(--line);border-radius:999px;padding:4px 14px;cursor:pointer}
+.seg input{accent-color:var(--accent)}
+.auto{font-size:.78rem;color:var(--accent)}
+.where{font-size:.8rem;color:var(--muted)}
+.mine{display:inline-block;font-size:.7rem;padding:0 8px;border-radius:999px;background:var(--gold-soft);color:var(--ink);margin-top:2px;width:max-content}
+.btnrow{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.status{font-size:.88rem;color:var(--accent)}
+.preview{list-style:none;margin:0;padding:0;max-height:240px;overflow:auto;border:1px solid var(--line);border-radius:10px}
+.preview li{padding:6px 10px;border-top:1px solid var(--line);display:flex;gap:8px;align-items:baseline;font-size:.85rem}
+.preview li:first-child{border-top:0}
+.preview li small{font-family:var(--mono);color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;flex:1}
+.preview li span{flex:none;max-width:40%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+</style>
+
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <h1>ポイ活URLランチャー</h1>
+  </header>
+
+  <div class="notice" id="notice" hidden></div>
+  <nav class="tabs" id="tabs" aria-label="カテゴリ"></nav>
+  <main id="sections"></main>
+
+  <details class="card" id="addPanel">
+    <summary id="addSummary">URLを登録</summary>
+    <form class="panel-body" id="addForm">
+      <p class="where" id="whereAdd"></p>
+      <div class="field"><label for="fUrl">URL</label><input id="fUrl" class="mono" required placeholder="https://..." autocomplete="off"></div>
+      <div class="field"><span class="flabel">カテゴリ <span class="auto" id="autoHint"></span></span>
+        <div class="seg" id="fCat">
+          <label><input type="radio" name="cat" id="catSake" value="お酒">お酒</label>
+          <label><input type="radio" name="cat" id="catOther" value="その他" checked>その他</label>
+          <label><input type="radio" name="cat" id="catX" value="X">X</label>
+        </div></div>
+      <div class="field"><label for="fTitle">名前（空欄ならURLから自動）</label><input id="fTitle" placeholder="例：ミニッツメイド"></div>
+      <div class="field" id="quoteField" hidden><label for="fQuote">引用（なくてもOK）</label><textarea id="fQuote" placeholder="引用ポストに貼る文章"></textarea></div>
+      <div class="btnrow">
+        <button class="btn primary" type="submit" id="fSubmit">登録する</button>
+        <button class="btn" type="button" id="fCancel" hidden>編集をやめる</button>
+        <span class="status" id="fStatus"></span>
+      </div>
+    </form>
+  </details>
+
+  <details class="card" id="mePanel">
+    <summary id="meSummary">🎯を消えないようにする</summary>
+    <div class="panel-body">
+      <div id="meOn" hidden><p id="meOnText"></p></div>
+      <div id="meOff">
+        <p class="notice" id="meSafari" hidden>Safariではこのページの保存データが自動で消されることがあり、🎯が勝手に外れます。下で自分用リンクを作って、そのリンクで開いてください。</p>
+        <p>🎯はふだん、このスマホのブラウザの中に保存されています。キャッシュやサイトデータの消去、別のブラウザ、シークレットタブでは消えてしまいます。名前つきの自分用リンクで開くと、🎯がサーバーに保存され、消えなくなります（別のスマホでも同じリンクなら引き継げます）。</p>
+        <div class="field"><label for="meName">名前（ほかの人とかぶらないもの。例：アルエ）</label><input id="meName" autocomplete="off" maxlength="30"></div>
+        <div class="btnrow"><button class="btn primary" type="button" id="meMake">自分用リンクを作る</button></div>
+        <div id="meResult" hidden>
+          <p>このリンクをブックマーク（またはLINEノート）に保存して、次からはこちらで開いてください。今の🎯はそのまま引き継がれます。</p>
+          <div class="field"><input id="meLink" class="mono" readonly></div>
+          <div class="btnrow"><button class="btn" type="button" id="meCopy">リンクをコピー</button><a class="btn primary" id="meOpen" target="_self">このリンクで開く</a></div>
+        </div>
+      </div>
+    </div>
+  </details>
+  <details class="card" id="brPanel">
+    <summary>リンクを開くブラウザ（iPhone向け）</summary>
+    <div class="panel-body">
+      <p>ふだんはそのまま（今使っているブラウザの新しいタブ）で開きます。iPhoneでSafariでこのページを開いているけれど、Chromeなどで開きたいときは選んでください。この端末だけの設定です。選んだアプリが入っていないと開けません。</p>
+      <div class="seg" id="brSeg">
+        <label><input type="radio" name="br" value="auto">そのまま</label>
+        <label><input type="radio" name="br" value="chrome">Chrome</label>
+        <label><input type="radio" name="br" value="edge">Edge</label>
+        <label><input type="radio" name="br" value="firefox">Firefox</label>
+      </div>
+    </div>
+  </details>
+
+  <details class="card" id="importPanel">
+    <summary>LINEノートからまとめて取り込む</summary>
+    <div class="panel-body">
+      <p>ノートの本文をそのまま貼り付けてください。URLを拾って、前の行を名前にします。カテゴリは自動で振り分けます（お酒のサイトは「お酒」、x.com は「X」、それ以外は「その他」）。</p>
+      <p class="where" id="whereImp"></p>
+      <div class="field"><label for="iText">ノートの本文</label><textarea id="iText" class="mono" style="min-height:120px"></textarea></div>
+      <ul class="preview" id="iPreview" hidden></ul>
+      <div class="btnrow"><button class="btn primary" type="button" id="iSave" disabled>取り込む</button><span class="status" id="iStatus"></span></div>
+    </div>
+  </details>
+</div>
+
+<script>
+(function(){
+let CATS=["お酒","その他","X"];
+const $=id=>document.getElementById(id);
+function lsGet(k,d){try{const v=localStorage.getItem(k);return v==null?d:JSON.parse(v)}catch(e){return d}}
+function lsSet(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}
+function esc(s){return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
+function domain(u){try{return new URL(u).hostname.replace(/^www\./,"")}catch(e){return u}}
+function newId(){return "l"+Date.now().toString(36)+Math.random().toString(36).slice(2,7)}
+function normUrl(u){u=u.trim();if(!/^https?:\/\//i.test(u))u="https://"+u;return u}
+function notice(msg){const n=$("notice");n.textContent=msg||"";n.hidden=!msg}
+function normCat(c){c=String(c||"");if(c.includes("酒"))return"お酒";if(/^X|Ｘ|twitter/i.test(c))return"X";return"その他"}
+
+// ---- 自動カテゴリ ----
+const SAKE_WORDS=["asahi","suntory","kirin","sapporo","beer","biru","sake","wine","whisky","whiskey","highball","chuhai","horoyoi","strongzero","-196","kinmugi","zeitaku","yebisu","malts","takara","yamazaki","hakushu","hibiki","nikka","kokuzou","otokoume","gekkeikan","hakutsuru","kodawari","hyoketsu","honkiri","kaku","jimbeam","lemondo"];
+function autoCat(url){const u=String(url).toLowerCase();let h="";try{h=new URL(normUrl(u)).hostname}catch(e){}
+  if(/(^|\.)(x\.com|twitter\.com|t\.co)$/.test(h))return"X";
+  if(SAKE_WORDS.some(w=>u.includes(w))||u.includes("%e9%85%92"))return"お酒";
+  return"その他"}
+
+// ---- 期限ラベル ----
+function ymd(s){if(!s)return null;const p=String(s).split("-").map(Number);return p.length===3?new Date(p[0],p[1]-1,p[2]):null}
+function daysLeft(s){const t=ymd(s);if(!t)return null;const n=new Date();n.setHours(0,0,0,0);return Math.round((t-n)/864e5)}
+function endBadge(l){if(!l.end)return"";const e=daysLeft(l.end),t=ymd(l.end),md=(t.getMonth()+1)+"/"+t.getDate();
+  if(e<0)return`<span class="badge">終了（${md}締切）</span>`;if(e===0)return`<span class="badge urgent">今日締切</span>`;
+  if(e<=3)return`<span class="badge warn">締切まであと${e}日</span>`;return`<span class="badge">${md}締切</span>`}
+
+// ---- JAN（ワンダなど） ----
+const EAN_L=["0001101","0011001","0010011","0111101","0100011","0110001","0101111","0111011","0110111","0001011"];
+const EAN_R=EAN_L.map(s=>s.replace(/./g,c=>c==="0"?"1":"0"));
+const EAN_G=EAN_R.map(s=>s.split("").reverse().join(""));
+const EAN_P=["LLLLLL","LLGLGG","LLGGLG","LLGGGL","LGLLGG","LGGLLG","LGGGLL","LGLGLG","LGLGGL","LGGLGL"];
+function checkDigit(b){let s=0;const n=b.length;for(let i=0;i<n;i++)s+=Number(b[n-1-i])*(i%2===0?3:1);return String((10-s%10)%10)}
+function validCode(c){return (c.length===13||c.length===8)&&checkDigit(c.slice(0,-1))===c.slice(-1)}
+function barcodeSvg(c){if(!validCode(c))return"";const d=c.split("").map(Number);let bits="101";
+  if(c.length===13){const p=EAN_P[d[0]];for(let i=1;i<=6;i++)bits+=(p[i-1]==="L"?EAN_L:EAN_G)[d[i]];bits+="01010";for(let i=7;i<=12;i++)bits+=EAN_R[d[i]]}
+  else{for(let i=0;i<4;i++)bits+=EAN_L[d[i]];bits+="01010";for(let i=4;i<8;i++)bits+=EAN_R[d[i]]}
+  bits+="101";const q=10,w=bits.length+q*2;let r="";for(let i=0;i<bits.length;i++)if(bits[i]==="1")r+=`<rect x="${i+q}" y="0" width="1" height="50"/>`;
+  return `<svg viewBox="0 0 ${w} 50" preserveAspectRatio="none" style="aspect-ratio:${w}/40" role="img" aria-label="バーコード ${c}"><rect width="${w}" height="50" fill="var(--bar-bg)"/><g fill="var(--bar-ink)">${r}</g></svg>`}
+const openJan=new Set();
+function janPanel(l){return `<div class="jan-panel">${l.jans.map(j=>`<div class="jan"><span class="code">${esc(j.code)}</span>${validCode(j.code)?`<div class="bc">${barcodeSvg(j.code)}</div>`:""}<button class="btn" data-copy="${esc(j.code)}">番号をコピー</button></div>`).join("")}</div>`}
+
+// ---- LINEから開いたとき、指定の行は標準ブラウザへ ----
+const IS_LINE=/\bLine\//i.test(navigator.userAgent);
+let BR=lsGet("poikatsu_browser","auto");
+function openUrl(l){
+  let u=l.url;
+  if(l.external&&IS_LINE)u=u+(u.includes("?")?"&":"?")+"openExternalBrowser=1";
+  const m=/^(https?):\/\/(.*)$/i.exec(u);if(!m||BR==="auto")return u;
+  if(BR==="chrome")return(m[1].toLowerCase()==="https"?"googlechromes://":"googlechrome://")+m[2];
+  if(BR==="edge")return"microsoft-edge-"+u;
+  if(BR==="firefox")return"firefox://open-url?url="+encodeURIComponent(u);
+  return u}
+
+// ---- 状態 ----
+let links=[],loaded=false;
+let locks=new Set(lsGet("poikatsu_locks",[]));
+let ME=null;
+function dirtyKey(){return "poikatsu_locks_dirty_"+ME}
+function saveLocks(){lsSet("poikatsu_locks",[...locks]);if(ME){lsSet(dirtyKey(),1);pushLocks()}}
+let pushing=false,pushAgain=false;
+async function pushLocks(){if(pushing){pushAgain=true;return}pushing=true;
+  try{do{pushAgain=false;await gs("setLocks",ME,[...locks])}while(pushAgain);lsSet(dirtyKey(),0);if(/保存中/.test($("notice").textContent))notice("")}
+  catch(e){notice("🎯をサーバーに保存できませんでした。通信状態を確認してください（この端末には残っています）。")}
+  finally{pushing=false}}
+function allLinks(){return links}
+function storeFor(){return store}
+let filter="all",editingId=null;
+
+// ---- 保存：Googleスプレッドシート ----
+function gs(fn,...args){
+  const post=fn!=="getData";
+  const opt=post?{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify({action:fn,args})}:undefined;
+  const url=post?window.API_URL:window.API_URL+"?action=getData&me="+encodeURIComponent(args[0]||"");
+  return fetch(url,opt).then(r=>r.json()).then(j=>{if(j&&j.error)throw{message:j.error};return j},e=>{throw (e instanceof Error)?{message:"通信できませんでした。電波の良いところで、もう一度試してください。"}:e})}
+let saving=false;
+async function write(fn,arg){
+  if(saving)throw{message:"保存中です。少し待ってください"};
+  saving=true;notice("保存しています…");
+  try{const list=await gs(fn,arg);setLinks(list);lsSet("poikatsu_cache",{links:list,cats:CATS});notice("")}
+  catch(e){const m=(e&&e.message)||String(e);notice("保存できませんでした："+m.replace(/^Error:\s*/,""));throw e}
+  finally{saving=false}}
+const store={
+  async save(l){await write("saveLinks",[l])},
+  async saveMany(ls){await write("saveLinks",ls)},
+  async remove(id){await write("removeLink",id)}};
+function setLinks(list){links=(list||[]).map(l=>Object.assign(l,{cat:normCat(l.cat)}));loaded=true;render()}
+async function init(){
+  const apply=d=>{if(d&&Array.isArray(d.cats)&&d.cats.length)CATS=d.cats.concat(["お酒","その他","X"].filter(x=>!d.cats.includes(x)));setLinks(d&&d.links)};
+  const me=(new URLSearchParams(location.search).get("me")||"").trim().slice(0,30);
+  const appUrl=location.origin+location.pathname;
+  const cached=lsGet("poikatsu_cache",null);
+  if(cached&&cached.links)apply(cached);
+  if(me)ME=me;
+  setupMe({appUrl});
+  try{
+    const B=await gs("getData",me);
+    if(ME){
+      if(lsGet(dirtyKey(),0))pushLocks();
+      else if(Array.isArray(B.locks)){locks=new Set(B.locks);lsSet("poikatsu_locks",[...locks])}
+      else if(locks.size)saveLocks()}
+    lsSet("poikatsu_cache",{links:B.links,cats:B.cats});
+    apply(B);if(ME)render();
+  }catch(e){if(!loaded)notice("読み込めませんでした："+((e&&e.message)||e))}}
+
+const IS_SAFARI=/safari/i.test(navigator.userAgent)&&!/chrome|crios|fxios|edg|android/i.test(navigator.userAgent);
+function setupMe(B){
+  const app=(B&&B.appUrl)||"";
+  if(!ME&&IS_SAFARI){$("mePanel").open=true;$("meSafari").hidden=false}
+  if(ME){$("meOn").hidden=false;$("meOff").hidden=true;$("meSummary").textContent="🎯の保存：「"+ME+"」用リンク";$("meOnText").textContent="「"+ME+"」用のリンクで開いています。🎯はサーバーに保存されるので、キャッシュを消しても消えません。次からもこのリンクで開いてください。";return}
+  $("meMake").addEventListener("click",()=>{const n=$("meName").value.trim();if(!n){$("meName").focus();return}
+    if(!app){notice("リンクを作れませんでした。ページを開き直してください。");return}
+    const u=app+(app.includes("?")?"&":"?")+"me="+encodeURIComponent(n);$("meLink").value=u;$("meOpen").href=u;$("meResult").hidden=false});
+  $("meCopy").addEventListener("click",e=>copyText(e.target,$("meLink").value))}
+
+document.addEventListener("change",e=>{if(e.target.name==="br"){BR=e.target.value;lsSet("poikatsu_browser",BR);render()}});
+{const r=document.querySelector('input[name="br"][value="'+BR+'"]');if(r)r.checked=true}
+
+// ---- 表示 ----
+function inCat(c){return allLinks().filter(l=>l.cat===c).sort((a,b)=>locks.has(a.id)-locks.has(b.id)||((daysLeft(a.end)??0)<0)-((daysLeft(b.end)??0)<0)||(a.order||0)-(b.order||0))}
+function row(l,i,arr){
+  const lk=locks.has(l.id),isX=l.cat==="X",over=l.end&&daysLeft(l.end)<0;
+  const inner=`<b>${esc(l.title||domain(l.url))}</b><small>${esc(l.url)}</small>${l.note?`<span class="note">${esc(l.note)}</span>`:""}${endBadge(l)}`;
+  const name=(isX||lk)?`<div class="name" ${lk?`data-locked="1"`:""}>${inner}</div>`:`<a class="name" href="${esc(openUrl(l))}" target="${BR==="auto"?"_blank":"_self"}" rel="noopener">${inner}</a>`;
+  return `<li class="row ${lk?"locked":""} ${over?"over":""}">
+    ${name}
+    <span class="acts">
+      <button class="btn" data-copy="${esc(l.url)}">URLコピー</button>
+      ${isX?`<button class="btn" data-copy="${esc(l.quote||"")}" ${l.quote?"":"disabled"}>引用コピー</button>`:""}
+      ${l.jans&&l.jans.length?`<button class="btn" data-jan="${l.id}">JAN ${l.jans.length}</button>`:""}
+      <button class="tgt" data-lock="${l.id}" aria-label="🎯">🎯</button>
+      <button class="lock" data-lock="${l.id}" aria-label="${lk?"鍵を外す":"鍵をかける"}">${lk?"🔒":"🔓"}</button>
+    </span>
+    ${isX?(l.quote?`<div class="quote"><em>「引用コピー」でコピーされる文章</em>${esc(l.quote)}</div>`:`<div class="quote none">引用文は未登録です（「編集」から追加できます）</div>`):""}
+    ${loaded?`<span class="edit">${i>1?`<button class="icon" data-top="${l.id}">⇈一番上へ</button>`:""}${i>0?`<button class="icon" data-up="${l.id}">↑上へ</button>`:""}${arr&&i<arr.length-1?`<button class="icon" data-down="${l.id}">↓下へ</button>`:""}<button class="icon" data-edit="${l.id}">編集</button><button class="icon" data-del="${l.id}">削除</button></span>`:""}
+    ${l.jans&&openJan.has(l.id)?janPanel(l):""}
+  </li>`}
+function render(){
+  const w="登録すると、このランチャーを見る全員に表示されます。";
+  $("whereAdd").textContent=w;$("whereImp").textContent=w;
+  const used=CATS.filter(c=>inCat(c).length);
+  if(filter!=="all"&&!used.includes(filter))filter="all";
+  $("tabs").innerHTML=[["all","すべて"],...used.map(c=>[c,c])].map(([v,t])=>`<button class="tab" data-tab="${esc(v)}" aria-pressed="${filter===v}">${esc(t)}</button>`).join("");
+  $("sections").innerHTML=used.filter(c=>filter==="all"||filter===c).map(c=>{const rows=inCat(c);
+    return `<section class="card cat"><div class="cat-head"><h2>${esc(c)}</h2><span class="count">${rows.length}件</span>${loaded?`<span class="catmove">${used.indexOf(c)>1?`<button class="icon" data-ctop="${esc(c)}" aria-label="カテゴリを一番上へ">⇈</button>`:""}${used.indexOf(c)>0?`<button class="icon" data-cup="${esc(c)}" aria-label="カテゴリを上へ">↑</button>`:""}${used.indexOf(c)<used.length-1?`<button class="icon" data-cdown="${esc(c)}" aria-label="カテゴリを下へ">↓</button>`:""}</span>`:""}</div>
+    ${rows.length?`<ol class="rows">${rows.map(row).join("")}</ol>`:`<p class="empty">まだありません。</p>`}</section>`}).join("")||`<div class="card cat"><p class="empty">${loaded?"まだURLが登録されていません。":"読み込み中…"}下の「URLを登録」から追加できます。</p></div>`;
+}
+
+// ---- 操作 ----
+async function copyText(btn,text){
+  try{try{await navigator.clipboard.writeText(text)}catch(e1){const ta=document.createElement("textarea");ta.value=text;ta.setAttribute("readonly","");ta.style.cssText="position:fixed;top:0;left:0;opacity:0";document.body.appendChild(ta);ta.select();ta.setSelectionRange(0,text.length);const ok=document.execCommand("copy");ta.remove();if(!ok)throw e1}
+    const o=btn.textContent;btn.textContent="コピーしました";btn.classList.add("copied");setTimeout(()=>{if(btn.isConnected){btn.textContent=o;btn.classList.remove("copied")}},1500)}
+  catch(e){notice("コピーできませんでした。長押しで選んでコピーしてください："+text)}}
+document.addEventListener("click",async e=>{
+  if(ME&&pushing&&e.target.closest("a.name")){e.preventDefault();notice("🎯を保存中です。少し待ってから、もう一度押してください。");return}
+  if(e.target.closest("[data-locked]")){notice("鍵がかかっています。🔒か🎯を押すと外れます。");return}
+  const t=e.target.closest("button");if(!t)return;
+  if(t.dataset.tab){filter=t.dataset.tab;render();return}
+  if(t.dataset.copy!==undefined){copyText(t,t.dataset.copy);return}
+  if(t.dataset.lock){const id=t.dataset.lock;locks.has(id)?locks.delete(id):locks.add(id);saveLocks();notice("");render();return}
+  if(t.dataset.jan){openJan.has(t.dataset.jan)?openJan.delete(t.dataset.jan):openJan.add(t.dataset.jan);render();return}
+  if(t.dataset.up||t.dataset.down){const id=t.dataset.up||t.dataset.down,d=t.dataset.up?-1:1;const c=links.find(l=>l.id===id);const rows=inCat(c.cat);const i=rows.indexOf(c),j=i+d;if(j<0||j>=rows.length)return;const p=rows[j];const a=p.order||0,b=c.order||0;
+    try{await store.saveMany([Object.assign({},c,{order:a===b?a+d:a}),Object.assign({},p,{order:a===b?a:b})])}catch(err){}return}
+  if(t.dataset.top){const c=links.find(l=>l.id===t.dataset.top);const rows=inCat(c.cat);const min=Math.min(...rows.map(r=>r.order||0));
+    try{await store.save(Object.assign({},c,{order:min-1}))}catch(err){}return}
+  if(t.dataset.ctop){const c=t.dataset.ctop;const a=[c].concat(CATS.filter(x=>x!==c));CATS=a;render();
+    try{CATS=await gs("setCatOrder",a);render()}catch(err){notice("並び順を保存できませんでした："+((err&&err.message)||err))}return}
+  if(t.dataset.cup||t.dataset.cdown){const c=t.dataset.cup||t.dataset.cdown,d=t.dataset.cup?-1:1;const used=CATS.filter(x=>inCat(x).length);const j=used.indexOf(c)+d;if(j<0||j>=used.length)return;
+    const o=used[j];const a=CATS.slice();const ia=a.indexOf(c),ib=a.indexOf(o);a[ia]=o;a[ib]=c;CATS=a;render();
+    try{CATS=await gs("setCatOrder",a);render()}catch(err){notice("並び順を保存できませんでした："+((err&&err.message)||err))}return}
+  if(t.dataset.edit){const l=allLinks().find(x=>x.id===t.dataset.edit);editingId=l.id;
+    $("fUrl").value=l.url;$("fTitle").value=l.title||"";$("fQuote").value=l.quote||"";setCat(l.cat);$("autoHint").textContent="";
+    $("fSubmit").textContent="保存する";$("fCancel").hidden=false;$("addSummary").textContent="URLを編集";$("addPanel").open=true;$("addPanel").scrollIntoView({behavior:"smooth"});return}
+  if(t.dataset.del){if(t.dataset.armed!=="1"){t.dataset.armed="1";t.textContent="本当に削除";t.classList.add("danger");setTimeout(()=>{if(t.isConnected){t.dataset.armed="";t.textContent="削除";t.classList.remove("danger")}},3000);return}
+    const dl=allLinks().find(x=>x.id===t.dataset.del);try{await storeFor(dl).remove(t.dataset.del)}catch(err){}return}
+});
+
+// ---- 登録フォーム ----
+function getCat(){return (document.querySelector('input[name="cat"]:checked')||{}).value||"その他"}
+function setCat(c){({"お酒":$("catSake"),"その他":$("catOther"),"X":$("catX")}[c]||$("catOther")).checked=true;$("quoteField").hidden=c!=="X"}
+let catTouched=false;
+$("fCat").addEventListener("change",()=>{catTouched=true;$("autoHint").textContent="";$("quoteField").hidden=getCat()!=="X"});
+$("fUrl").addEventListener("input",()=>{if(catTouched||editingId)return;const v=$("fUrl").value.trim();if(!v){$("autoHint").textContent="";return}
+  const c=autoCat(v);setCat(c);$("autoHint").textContent="（URLから「"+c+"」と判断。違えば選び直してください）"});
+function resetForm(){editingId=null;catTouched=false;$("addForm").reset();setCat("その他");$("autoHint").textContent="";$("fSubmit").textContent="登録する";$("fCancel").hidden=true;$("addSummary").textContent="URLを登録"}
+$("fCancel").addEventListener("click",resetForm);
+$("addForm").addEventListener("submit",async e=>{e.preventDefault();if(!$("fUrl").value.trim())return;
+  const url=normUrl($("fUrl").value),cat=getCat();
+  const base=editingId?allLinks().find(l=>l.id===editingId):{id:newId(),order:Date.now()};
+  const l=Object.assign({},base,{url,cat,title:$("fTitle").value.trim()||domain(url)});
+  if(cat==="X")l.quote=$("fQuote").value.trim();else delete l.quote;
+  const was=!!editingId;
+  try{await storeFor(editingId?base:null).save(l);resetForm();$("fStatus").textContent=was?"保存しました":"登録しました"}catch(err){$("fStatus").textContent="保存できませんでした："+((err&&(err.message||err.code))||"")}
+  setTimeout(()=>$("fStatus").textContent="",2500)});
+
+// ---- LINEノート取り込み ----
+const URL_RE=/(https?:\/\/[^\s<>"'「」（）]+)/gi;
+function parseNote(text){const out=[];let last="";
+  for(const raw of text.split(/\r?\n/)){const line=raw.trim();if(!line)continue;const urls=line.match(URL_RE);
+    if(!urls){last=line.replace(/^[・\-*●■◆◎○【\s]+|[】:：\s]+$/g,"");continue}
+    const rest=line.replace(URL_RE,"").replace(/^[・\-*●■◆◎○【\s]+|[】:：\s]+$/g,"").trim();
+    urls.forEach(u=>{u=u.replace(/[。、.,)]+$/,"");out.push({title:rest||last||domain(u),url:u,cat:autoCat(u)})});last=""}
+  const seen=new Set(allLinks().map(l=>l.url));return out.map(x=>Object.assign(x,{dup:seen.has(x.url)}))}
+let parsed=[];
+$("iText").addEventListener("input",()=>{parsed=parseNote($("iText").value);const p=$("iPreview");p.hidden=!parsed.length;
+  p.innerHTML=parsed.map(x=>`<li><span>［${esc(x.cat)}］${esc(x.title)}</span><small>${esc(x.url)}</small>${x.dup?"<em>登録済み</em>":""}</li>`).join("");
+  const n=parsed.filter(x=>!x.dup).length;$("iSave").disabled=!n;$("iSave").textContent=n?`${n}件を取り込む`:"取り込む"});
+$("iSave").addEventListener("click",async()=>{const items=parsed.filter(x=>!x.dup),base=Date.now();$("iSave").disabled=true;$("iStatus").textContent="取り込み中…";
+  try{await storeFor(null).saveMany(items.map((x,i)=>({id:newId(),title:x.title,url:x.url,cat:x.cat,order:base+i})));$("iStatus").textContent=items.length+"件を取り込みました"}
+  catch(err){$("iStatus").textContent="取り込めませんでした："+((err&&(err.message||err.code))||"")}});
+
+render();init();
+})();
+</script>
+</body>
+</html>
