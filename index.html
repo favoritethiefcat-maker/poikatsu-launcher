@@ -256,17 +256,21 @@ function gs(fn,...args){
   const opt=post?{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify({action:fn,args})}:undefined;
   const url=post?window.API_URL:window.API_URL+"?action=getData&me="+encodeURIComponent(args[0]||"");
   return fetch(url,opt).then(r=>r.json()).then(j=>{if(j&&j.error)throw{message:j.error};return j},e=>{throw (e instanceof Error)?{message:"通信できませんでした。電波の良いところで、もう一度試してください。"}:e})}
-let saving=false;
-async function write(fn,arg){
-  if(saving)throw{message:"保存中です。少し待ってください"};
-  saving=true;notice("保存しています…");
-  try{const list=await gs(fn,arg);setLinks(list);lsSet("poikatsu_cache",{links:list,cats:CATS});notice("")}
-  catch(e){const m=(e&&e.message)||String(e);notice("保存できませんでした："+m.replace(/^Error:\s*/,""));throw e}
-  finally{saving=false}}
+// 画面はすぐ書き換え、保存は裏で順番に送ります（待たずに次の操作ができます）
+let pending=0,queue=Promise.resolve();
+function cacheLocal(){lsSet("poikatsu_cache",{links,cats:CATS})}
+function upsertLocal(ls){ls.forEach(l=>{const n=Object.assign({},l,{cat:normCat(l.cat)});const i=links.findIndex(x=>x.id===n.id);if(i>=0)links[i]=n;else links.push(n)});cacheLocal();render()}
+function removeLocal(id){links=links.filter(l=>l.id!==id);cacheLocal();render()}
+async function resync(){try{const d=await gs("getData",ME||"");if(!pending)setLinks(d.links),cacheLocal()}catch(e){}}
+function write(fn,arg){
+  pending++;notice("");
+  const p=queue.then(()=>gs(fn,arg));queue=p.catch(()=>{});
+  return p.then(list=>{pending--;if(!pending){setLinks(list);cacheLocal()}},
+    e=>{pending--;const m=(e&&e.message)||String(e);notice("保存できませんでした："+m.replace(/^Error:\s*/,"")+"（元に戻しました）");resync();throw e})}
 const store={
-  async save(l){await write("saveLinks",[l])},
-  async saveMany(ls){await write("saveLinks",ls)},
-  async remove(id){await write("removeLink",id)}};
+  save(l){upsertLocal([l]);return write("saveLinks",[l])},
+  saveMany(ls){upsertLocal(ls);return write("saveLinks",ls)},
+  remove(id){removeLocal(id);return write("removeLink",id)}};
 function setLinks(list){links=(list||[]).map(l=>Object.assign(l,{cat:normCat(l.cat)}));loaded=true;render()}
 async function init(){
   const apply=d=>{if(d&&Array.isArray(d.cats)&&d.cats.length)CATS=d.cats.concat(["お酒","その他","X"].filter(x=>!d.cats.includes(x)));setLinks(d&&d.links)};
@@ -282,8 +286,7 @@ async function init(){
       if(lsGet(dirtyKey(),0))pushLocks();
       else if(Array.isArray(B.locks)){locks=new Set(B.locks);lsSet("poikatsu_locks",[...locks])}
       else if(locks.size)saveLocks()}
-    lsSet("poikatsu_cache",{links:B.links,cats:B.cats});
-    apply(B);if(ME)render();
+    if(!pending){lsSet("poikatsu_cache",{links:B.links,cats:B.cats});apply(B)}if(ME)render();
   }catch(e){if(!loaded)notice("読み込めませんでした："+((e&&e.message)||e))}}
 
 const IS_SAFARI=/safari/i.test(navigator.userAgent)&&!/chrome|crios|fxios|edg|android/i.test(navigator.userAgent);
@@ -343,9 +346,9 @@ document.addEventListener("click",async e=>{
   if(t.dataset.lock){const id=t.dataset.lock;locks.has(id)?locks.delete(id):locks.add(id);saveLocks();notice("");render();return}
   if(t.dataset.jan){openJan.has(t.dataset.jan)?openJan.delete(t.dataset.jan):openJan.add(t.dataset.jan);render();return}
   if(t.dataset.up||t.dataset.down){const id=t.dataset.up||t.dataset.down,d=t.dataset.up?-1:1;const c=links.find(l=>l.id===id);const rows=inCat(c.cat);const i=rows.indexOf(c),j=i+d;if(j<0||j>=rows.length)return;const p=rows[j];const a=p.order||0,b=c.order||0;
-    try{await store.saveMany([Object.assign({},c,{order:a===b?a+d:a}),Object.assign({},p,{order:a===b?a:b})])}catch(err){}return}
+    store.saveMany([Object.assign({},c,{order:a===b?a+d:a}),Object.assign({},p,{order:a===b?a:b})]).catch(()=>{});return}
   if(t.dataset.top){const c=links.find(l=>l.id===t.dataset.top);const rows=inCat(c.cat);const min=Math.min(...rows.map(r=>r.order||0));
-    try{await store.save(Object.assign({},c,{order:min-1}))}catch(err){}return}
+    store.save(Object.assign({},c,{order:min-1})).catch(()=>{});return}
   if(t.dataset.ctop){const c=t.dataset.ctop;const a=[c].concat(CATS.filter(x=>x!==c));CATS=a;render();
     try{CATS=await gs("setCatOrder",a);render()}catch(err){notice("並び順を保存できませんでした："+((err&&err.message)||err))}return}
   if(t.dataset.cup||t.dataset.cdown){const c=t.dataset.cup||t.dataset.cdown,d=t.dataset.cup?-1:1;const used=CATS.filter(x=>inCat(x).length);const j=used.indexOf(c)+d;if(j<0||j>=used.length)return;
@@ -355,7 +358,7 @@ document.addEventListener("click",async e=>{
     $("fUrl").value=l.url;$("fTitle").value=l.title||"";$("fQuote").value=l.quote||"";setCat(l.cat);$("autoHint").textContent="";
     $("fSubmit").textContent="保存する";$("fCancel").hidden=false;$("addSummary").textContent="URLを編集";$("addPanel").open=true;$("addPanel").scrollIntoView({behavior:"smooth"});return}
   if(t.dataset.del){if(t.dataset.armed!=="1"){t.dataset.armed="1";t.textContent="本当に削除";t.classList.add("danger");setTimeout(()=>{if(t.isConnected){t.dataset.armed="";t.textContent="削除";t.classList.remove("danger")}},3000);return}
-    const dl=allLinks().find(x=>x.id===t.dataset.del);try{await storeFor(dl).remove(t.dataset.del)}catch(err){}return}
+    const dl=allLinks().find(x=>x.id===t.dataset.del);storeFor(dl).remove(t.dataset.del).catch(()=>{});return}
 });
 
 // ---- 登録フォーム ----
@@ -373,7 +376,8 @@ $("addForm").addEventListener("submit",async e=>{e.preventDefault();if(!$("fUrl"
   const l=Object.assign({},base,{url,cat,title:$("fTitle").value.trim()||domain(url)});
   if(cat==="X")l.quote=$("fQuote").value.trim();else delete l.quote;
   const was=!!editingId;
-  try{await storeFor(editingId?base:null).save(l);resetForm();$("fStatus").textContent=was?"保存しました":"登録しました"}catch(err){$("fStatus").textContent="保存できませんでした："+((err&&(err.message||err.code))||"")}
+  storeFor(editingId?base:null).save(l).catch(err=>{$("fStatus").textContent="保存できませんでした："+((err&&(err.message||err.code))||"")});
+  resetForm();$("fStatus").textContent=was?"保存しました":"登録しました";
   setTimeout(()=>$("fStatus").textContent="",2500)});
 
 // ---- LINEノート取り込み ----
@@ -389,8 +393,8 @@ $("iText").addEventListener("input",()=>{parsed=parseNote($("iText").value);cons
   p.innerHTML=parsed.map(x=>`<li><span>［${esc(x.cat)}］${esc(x.title)}</span><small>${esc(x.url)}</small>${x.dup?"<em>登録済み</em>":""}</li>`).join("");
   const n=parsed.filter(x=>!x.dup).length;$("iSave").disabled=!n;$("iSave").textContent=n?`${n}件を取り込む`:"取り込む"});
 $("iSave").addEventListener("click",async()=>{const items=parsed.filter(x=>!x.dup),base=Date.now();$("iSave").disabled=true;$("iStatus").textContent="取り込み中…";
-  try{await storeFor(null).saveMany(items.map((x,i)=>({id:newId(),title:x.title,url:x.url,cat:x.cat,order:base+i})));$("iStatus").textContent=items.length+"件を取り込みました"}
-  catch(err){$("iStatus").textContent="取り込めませんでした："+((err&&(err.message||err.code))||"")}});
+  storeFor(null).saveMany(items.map((x,i)=>({id:newId(),title:x.title,url:x.url,cat:x.cat,order:base+i}))).catch(err=>{$("iStatus").textContent="取り込めませんでした："+((err&&(err.message||err.code))||"")});
+  $("iStatus").textContent=items.length+"件を取り込みました"});
 
 render();init();
 })();
